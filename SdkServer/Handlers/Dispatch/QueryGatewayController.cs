@@ -11,15 +11,78 @@ namespace KianaBH.SdkServer.Handlers.Dispatch;
 public class QueryGatewayController : ControllerBase
 {
     [HttpGet("/query_gateway")]
-    public IActionResult QueryGateway([FromQuery] DispatchQuery query, Logger logger)
+    public async Task<IActionResult> QueryGateway([FromQuery] DispatchQuery query, Logger logger)
     {
         var version = HotfixContainer.ExtractVersionNumber(query.Version);
         var hotfix_version = query.Version!;
 
         if (!ConfigManager.Hotfix.Hotfixes.TryGetValue(hotfix_version, out var hotfix))
         {
-            logger.Warn($"Client sent requesting unsupported game version: {hotfix_version}");
-            return BadRequest();
+            if (ConfigManager.Hotfix.AesKeys.TryGetValue(version, out var aesKey))
+            {
+                var parts = hotfix_version.Split('_');
+                var region = string.Join('_', parts.SkipWhile(p => char.IsDigit(p[0])));
+
+                var domainMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    { "gf_pc_beta", "outer-dp-beta-release.bh3.com" },
+                    { "os_pc", "outer-dp-overseas01.honkaiimpact3.com" },
+                    { "global_pc", "outer-dp-usa01.honkaiimpact3.com" },
+                    { "gf_pc", "outer-dp-pc01.bh3.com" },
+                    { "jp_pc", "outer-dp-jp01.honkaiimpact3.com" },
+                    { "kr_pc", "outer-dp-kr01.honkaiimpact3.com" },
+                    { "tw_pc", "outer-dp-asia01.honkaiimpact3.com" }
+                };
+
+                if (!domainMap.TryGetValue(region, out var domain))
+                {
+                    logger.Warn($"[AUTO-HOTFIX] Unknown region '{region}' for version {hotfix_version}");
+                    return BadRequest();
+                }
+
+                var hotfixUrl = $"https://proxy1.neonteam.dev/{domain}/query_gameserver?version={hotfix_version}&t={query.Timestamp}&uid={query.Uid}&token={query.Token}";
+
+                using var http = new HttpClient();
+                try
+                {
+                    var httpResponse = await http.GetAsync(hotfixUrl);
+                    if (!httpResponse.IsSuccessStatusCode)
+                    {
+                        logger.Warn($"[AUTO-HOTFIX] Failed to fetch hotfix from {hotfixUrl}: {httpResponse.StatusCode}");
+                        return BadRequest();
+                    }
+
+                    var base64 = (await httpResponse.Content.ReadAsStringAsync()).Trim();
+
+                    string? decryptedText = null;
+                    try
+                    {
+                        decryptedText = DispatchEncryption.DecryptDispatchContent(version, base64);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error($"[AUTO-HOTFIX] Decrypt error: {ex.Message}");
+                    }
+
+                    ConfigManager.SaveHotfixData(hotfix_version, decryptedText!);
+
+                    if (!ConfigManager.Hotfix.Hotfixes.TryGetValue(hotfix_version, out hotfix))
+                    {
+                        logger.Warn($"[AUTO-HOTFIX] Failed to retrieve hotfix after saving for version {hotfix_version}");
+                        return BadRequest();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.Error($"[AUTO-HOTFIX] Exception while fetching hotfix: {ex.Message}");
+                    return BadRequest();
+                }
+            }
+            else
+            {
+                logger.Warn($"Client sent requesting unsupported game version: {hotfix_version}");
+                return BadRequest();
+            }
         }
 
         var serverInfo = new QueryGatewayResponse.ServerInfo
@@ -93,8 +156,8 @@ public static partial class UrlProvider
             ],
             "gf" when version.Contains("beta") =>
             [
-                "https://autopatchbeta.bh3.com/asset_bundle/beta_dev/1.0",
-                "https://bh3rd-beta.bh3.com/asset_bundle/beta_release/1.0",
+                "https://autopatchbeta.bh3.com/asset_bundle/beta_release/1.0",
+                "https://bh3rd-beta.bh3.com/asset_bundle/beta_release/1.0"
             ],
             "gf" =>
             [
@@ -143,7 +206,7 @@ public static partial class UrlProvider
             "gf" when version.Contains("beta") =>
             [
                 "autopatchbeta.bh3.com/tmp/CGAudio",
-                "autopatchbeta.bh3.com/tmp/CGAudio",
+                "bh3rd-beta.bh3.com/tmp/CGAudio"
             ],
             _ =>
             [

@@ -2,6 +2,7 @@
 using KianaBH.Internationalization;
 using Newtonsoft.Json;
 using KianaBH.Util.Extensions;
+using System.Text.Json;
 
 namespace KianaBH.Util;
 
@@ -75,6 +76,40 @@ public static class ConfigManager
                 Hotfix.Hotfixes[version] = new();
 
         SaveData(Hotfix, HotfixFilePath);
+    }
+
+    public static void SaveHotfixData(string version, string decryptedText)
+    {
+        LoadHotfixData();
+
+        try
+        {
+            using var doc = JsonDocument.Parse(decryptedText);
+            if (!doc.RootElement.TryGetProperty("manifest", out var manifestElement))
+            {
+                Logger.Warn($"[AUTO-HOTFIX] Manifest not found in decrypted hotfix for version {version}");
+                return;
+            }
+
+            var manifestJson = manifestElement.GetRawText();
+            var manifestData = System.Text.Json.JsonSerializer.Deserialize<HotfixManfiset>(manifestJson);
+
+            if (manifestData == null)
+            {
+                Logger.Warn($"[AUTO-HOTFIX] Failed to parse manifest for version {version}");
+                return;
+            }
+
+            Hotfix.Hotfixes[version] = manifestData;
+
+            SaveData(Hotfix, HotfixFilePath);
+
+            Logger.Info($"[AUTO-HOTFIX] Saved hotfix manifest for version {version}");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"[AUTO-HOTFIX] Failed to save hotfix data: {ex.Message}");
+        }
     }
 
     private static void SaveData(object data, string path)

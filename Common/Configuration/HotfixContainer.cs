@@ -52,7 +52,7 @@ public class AudioData
 
 public class AudioPreDownloadData
 {
-    [JsonPropertyName("enable_time")] public long EnableTime { get; set; }
+    [JsonPropertyName("enable_time")] public double EnableTime { get; set; }
     [JsonPropertyName("platform")] public Dictionary<string, string> Platform { get; set; } = new();
     [JsonPropertyName("revision")] public int Revision { get; set; }
 }
@@ -64,7 +64,7 @@ public class VideoEncryptData
 
 public class PlatformInfo
 {
-    [JsonPropertyName("enable_time")] public long EnableTime { get; set; }
+    [JsonPropertyName("enable_time")] public double EnableTime { get; set; }
     [JsonPropertyName("revision")] public string Revision { get; set; } = "";
     [JsonPropertyName("suffix")] public string Suffix { get; set; } = "";
 }

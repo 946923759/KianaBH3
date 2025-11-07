@@ -32,4 +32,25 @@ public static class DispatchEncryption
 
         return Convert.ToBase64String(encryptedBytes);
     }
+
+    public static string? DecryptDispatchContent(string version, string base64Data)
+    {
+        if (!ConfigManager.Hotfix.AesKeys.TryGetValue(version, out var aesKey))
+            return null;
+
+        var keyBytes = aesKey.Split(' ')
+            .Select(b => Convert.ToByte(b, 16))
+            .ToArray();
+
+        using var aes = Aes.Create();
+        aes.Mode = CipherMode.ECB;
+        aes.Padding = PaddingMode.PKCS7;
+        aes.Key = keyBytes;
+
+        var decryptor = aes.CreateDecryptor();
+        var dataBytes = Convert.FromBase64String(base64Data);
+        var decryptedBytes = decryptor.TransformFinalBlock(dataBytes, 0, dataBytes.Length);
+
+        return Encoding.UTF8.GetString(decryptedBytes);
+    }
 }

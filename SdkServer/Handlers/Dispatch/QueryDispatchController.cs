@@ -14,11 +14,11 @@ public class QueryDispatchController : ControllerBase
     {
         var version = HotfixContainer.ExtractVersionNumber(query.Version);
         var hotfix_version = query.Version!;
-        if (!ConfigManager.Hotfix.Hotfixes.ContainsKey(hotfix_version))
-        {
-            logger.Warn($"Client sent requesting unsupported game version: {hotfix_version}");
-            return BadRequest();
-        }
+        //if (!ConfigManager.Hotfix.Hotfixes.ContainsKey(hotfix_version))
+        //{
+        //    logger.Warn($"Client sent requesting unsupported game version: {hotfix_version}");
+        //    return BadRequest();
+        //}
 
         var response = new QueryDispatchResponse
         {
