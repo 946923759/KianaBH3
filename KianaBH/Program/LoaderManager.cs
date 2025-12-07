@@ -152,6 +152,9 @@ public class LoaderManager : KianaBH
         }
     }
 
+    /// <summary>
+    /// Register all commands and add listeners
+    /// </summary>
     public static void InitCommand()
     {
         // Register the command handlers
@@ -170,6 +173,5 @@ public class LoaderManager : KianaBH
         IConsole.OnConsoleExcuteCommand += CommandExecutor.ConsoleExcuteCommand;
         CommandExecutor.OnRunCommand += (sender, e) => { CommandManager.HandleCommand(e, sender); };
 
-        IConsole.ListenConsole();
     }
 }
